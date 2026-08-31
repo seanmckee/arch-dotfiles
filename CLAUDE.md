@@ -211,12 +211,12 @@ Laptop, so prefer event-driven modules over polling.
 
 ## Known pre-existing issues (unfixed, flagged)
 
-1. **`monitors.lua` is orphaned** — nothing `require`s it, so the nwg-displays
-   three-monitor layout is NOT applied. `monitors.conf` (a 3-monitor nwg-displays
-   dump) and `workspaces.conf` (0 bytes) are dead files too, as are
-   `hyprland.lua.bak` and `kitty.conf.bak`. Safe to delete; nothing references them.
-2. `hyprpaper.conf` sets a wallpaper only for `eDP-1` and has no `preload` line.
-3. `local menu = "hyprlauncher"` in hyprland.lua is dead code (not installed; fuzzel is used).
+1. `hyprpaper.conf` sets a wallpaper only for `eDP-1` and has no `preload` line.
+2. `local menu = "hyprlauncher"` in hyprland.lua is dead code (not installed; fuzzel is used).
+
+The orphaned `monitors.lua` / `monitors.conf` / `workspaces.conf` and the `.bak`
+files were deleted on 2026-08-31. Single internal display; if you ever attach
+monitors, note that nwg-displays emits hyprlang, which this Lua config cannot read.
 
 ## Working style
 
