@@ -78,6 +78,12 @@ missing — **do not regenerate gradients over the real wallpapers.**
 | `lazygit.yml` | `lazygit/.config/lazygit/config.yml` |
 | `tmux.conf` | `tmux/.tmux.conf` |
 | `nvim-palette.lua` | `nvim/.config/nvim/lua/theme/current.lua` |
+| `hyprlock.conf` | `hypr/.config/hypr/hyprlock.conf` |
+
+`hyprlock.conf` uses `@@wallpaper_path@@`, a key derived at apply time by
+`resolve_wallpaper()` — the same lookup hyprpaper uses, so the lock screen always
+shows the theme's real wallpaper rather than the palette's `wallpaper=` gradient.
+hyprlock reads its config at launch, so there is nothing to live-reload.
 
 Palette keys are semantic (`bg fg dim muted accent accent2 sel red green yellow blue
 magenta cyan border_active1/2 border_inactive wallpaper`). The script derives

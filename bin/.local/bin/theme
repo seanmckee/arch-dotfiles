@@ -28,6 +28,7 @@ TARGETS = {
     "lazygit.yml":       f"{DOT}/lazygit/.config/lazygit/config.yml",
     "tmux.conf":         f"{DOT}/tmux/.tmux.conf",
     "nvim-palette.lua":  f"{DOT}/nvim/.config/nvim/lua/theme/current.lua",
+    "hyprlock.conf":     f"{DOT}/hypr/.config/hypr/hyprlock.conf",
 }
 
 
@@ -56,6 +57,20 @@ def load(name):
             p[f"{key}_g"] = str(int(h[2:4], 16))
             p[f"{key}_b"] = str(int(h[4:6], 16))
     return p
+
+
+def resolve_wallpaper(pal):
+    """Path this theme should use: a real image named after the theme wins,
+    else the palette's `wallpaper=` (normally a generated gradient)."""
+    wpdir = f"{HOME}/Pictures/wallpapers"
+    for ext in ("png", "jpg", "jpeg", "webp"):
+        cand = f"{wpdir}/{pal.get('_theme', '')}.{ext}"
+        if os.path.exists(cand):
+            return cand
+    wp = pal.get("wallpaper", "")
+    if wp:
+        return wp if wp.startswith("/") else f"{wpdir}/{wp}"
+    return ""
 
 
 def render(pal):
@@ -120,19 +135,8 @@ def reload_all(pal):
     if run("hyprctl reload"):
         ok.append("hyprland")
 
-    # wallpaper: prefer a real image named after the theme, else the palette's
-    # `wallpaper=` (normally the generated gradient placeholder).
-    wpdir = f"{HOME}/Pictures/wallpapers"
-    path = ""
-    for ext in ("png", "jpg", "jpeg", "webp"):
-        cand = f"{wpdir}/{pal['_theme']}.{ext}"
-        if os.path.exists(cand):
-            path = cand
-            break
-    if not path:
-        wp = pal.get("wallpaper", "")
-        if wp:
-            path = wp if wp.startswith("/") else f"{wpdir}/{wp}"
+    # wallpaper (same path the hyprlock template is rendered with)
+    path = resolve_wallpaper(pal)
     if path:
         if os.path.exists(path):
             run(f'hyprctl hyprpaper preload "{path}"')
@@ -151,6 +155,7 @@ def reload_all(pal):
 def apply(name):
     pal = load(name)
     pal['_theme'] = name
+    pal['wallpaper_path'] = resolve_wallpaper(pal)
     render(pal)
     ok = reload_all(pal)
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
