@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+command -v cliphist >/dev/null || {
+	notify-send "Clipboard history" "Install cliphist to use this picker"
+	exit 1
+}
+
+selection="$(cliphist list | fuzzel --dmenu --prompt 'clipboard  ' --width 80 --lines 18)" || exit 0
+[[ -n "$selection" ]] || exit 0
+
+printf '%s' "$selection" | cliphist decode | wl-copy

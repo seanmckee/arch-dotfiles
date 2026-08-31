@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pick_project() {
+	{
+		[[ -d "$HOME/dev" ]] && fd -H -t d '^\.git$' "$HOME/dev" --max-depth 5 -x dirname
+		command -v zoxide >/dev/null && zoxide query --list 2>/dev/null
+	} | awk '!seen[$0]++' | while IFS= read -r path; do
+		[[ -d "$path" ]] && printf '%s\n' "$path"
+	done | fzf --prompt='project> ' --height=80% --layout=reverse --border
+}
+
+project="${1:-}"
+if [[ -z "$project" ]]; then
+	project="$(pick_project)" || exit 0
+fi
+
+project="$(realpath "$project")"
+[[ -d "$project" ]] || {
+	printf 'devsession: directory not found: %s\n' "$project" >&2
+	exit 1
+}
+
+name="$(basename "$project" | tr -cs '[:alnum:]_-' '-')"
+session="dev-${name%-}"
+
+if ! tmux has-session -t "=$session" 2>/dev/null; then
+	tmux new-session -d -s "$session" -c "$project" -n editor
+	tmux send-keys -t "$session:editor" 'nvim .' Enter
+	tmux new-window -d -t "$session" -c "$project" -n shell
+	tmux new-window -d -t "$session" -c "$project" -n git lazygit
+	command -v claude >/dev/null && tmux new-window -d -t "$session" -c "$project" -n agent claude
+
+	if mise -C "$project" tasks ls --name-only 2>/dev/null | grep -qx dev; then
+		tmux new-window -d -t "$session" -c "$project" -n dev 'mise run dev'
+	else
+		# Preserve the common monorepo workflow without hard-coding it as the
+		# only supported project layout. A `mise run dev` task takes precedence.
+		for app in frontend backend; do
+			package="$project/$app/package.json"
+			if [[ -f "$package" ]] && jq -e '.scripts.dev' "$package" >/dev/null; then
+				tmux new-window -d -t "$session" -c "$project/$app" -n "$app" "zsh -lc 'npm run dev; exec zsh'"
+			fi
+		done
+		if [[ -f "$project/package.json" ]] && jq -e '.scripts.dev' "$project/package.json" >/dev/null; then
+			tmux new-window -d -t "$session" -c "$project" -n dev "zsh -lc 'npm run dev; exec zsh'"
+		fi
+	fi
+fi
+
+tmux select-window -t "$session:editor"
+if [[ -n "${TMUX:-}" ]]; then
+	exec tmux switch-client -t "$session"
+else
+	exec tmux attach-session -t "$session"
+fi

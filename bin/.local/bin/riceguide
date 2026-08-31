@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+guide="$HOME/dotfiles/GUIDE.md"
+[[ -r "$guide" ]] || {
+	printf 'riceguide: guide not found: %s\n' "$guide" >&2
+	exit 1
+}
+
+exec bat --plain --language markdown --paging always "$guide"

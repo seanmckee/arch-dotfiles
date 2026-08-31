@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Switch the desktop theme: palettes -> templates -> configs -> live reload.
+
+  theme            pick interactively (fuzzel)
+  theme list       list available themes
+  theme set NAME   apply a theme
+  theme current    show the active theme
+"""
+import os, re, subprocess, sys, glob, shutil
+
+HOME = os.path.expanduser("~")
+DOT = f"{HOME}/dotfiles"
+THEMES = f"{DOT}/themes"
+STATE = f"{HOME}/.local/state/current-theme"
+
+# template -> destination (inside the dotfiles repo; symlinks make them live)
+TARGETS = {
+    "waybar.css":        f"{DOT}/waybar/.config/waybar/style.css",
+    "fuzzel.ini":        f"{DOT}/fuzzel/.config/fuzzel/fuzzel.ini",
+    "mako.config":       f"{DOT}/mako/.config/mako/config",
+    "kitty-colors.conf": f"{DOT}/kitty/.config/kitty/current-theme.conf",
+    "hypr-colors.lua":   f"{DOT}/hypr/.config/hypr/colors.lua",
+    "btop.theme":        f"{DOT}/btop/.config/btop/themes/current.theme",
+    "lazygit.yml":       f"{DOT}/lazygit/.config/lazygit/config.yml",
+    "tmux.conf":         f"{DOT}/tmux/.tmux.conf",
+}
+
+
+def palettes():
+    return sorted(os.path.basename(p)[:-5]
+                  for p in glob.glob(f"{THEMES}/palettes/*.conf"))
+
+
+def load(name):
+    path = f"{THEMES}/palettes/{name}.conf"
+    if not os.path.exists(path):
+        sys.exit(f"theme: no such theme '{name}'. Available: {', '.join(palettes())}")
+    p = {}
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                p[k.strip()] = v.strip()
+    # derive: bare hex (no '#') and decimal rgb components
+    for key in [k for k in list(p) if p[k].startswith("#")]:
+        h = p[key].lstrip("#")
+        p[f"{key}_hex"] = h
+        if len(h) == 6:
+            p[f"{key}_r"] = str(int(h[0:2], 16))
+            p[f"{key}_g"] = str(int(h[2:4], 16))
+            p[f"{key}_b"] = str(int(h[4:6], 16))
+    return p
+
+
+def render(pal):
+    missing = set()
+    for tmpl, dest in TARGETS.items():
+        src = f"{THEMES}/templates/{tmpl}"
+        if not os.path.exists(src):
+            continue
+        with open(src, encoding="utf-8") as f:
+            text = f.read()
+
+        def repl(m):
+            k = m.group(1)
+            if k not in pal:
+                missing.add(k)
+                return m.group(0)
+            return pal[k]
+
+        out = re.sub(r"@@([a-z0-9_]+)@@", repl, text)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, "w", encoding="utf-8") as f:
+            f.write(out)
+    if missing:
+        print(f"  ! undefined palette keys: {', '.join(sorted(missing))}", file=sys.stderr)
+
+
+def run(cmd, quiet=True):
+    try:
+        return subprocess.run(cmd, shell=True, capture_output=quiet, timeout=10).returncode == 0
+    except Exception:
+        return False
+
+
+def reload_all(pal):
+    ok = []
+
+    # waybar: reload config + css in place
+    if run("pkill -SIGUSR2 waybar"):
+        ok.append("waybar")
+
+    # mako: reload notification styling
+    if run("makoctl reload"):
+        ok.append("mako")
+
+    # kitty: retheme every RUNNING window via remote control
+    socks = glob.glob("/tmp/kitty-*")
+    hit = 0
+    colors = f"{HOME}/.config/kitty/current-theme.conf"
+    for s in socks:
+        if run(f"kitty @ --to unix:{s} set-colors --all --configured {colors}"):
+            hit += 1
+    if hit:
+        ok.append(f"kitty({hit})")
+
+    # tmux: repaint running sessions without interrupting them.
+    if run(f"tmux source-file {HOME}/.tmux.conf"):
+        ok.append("tmux")
+
+    # hyprland: reload so the generated colors.lua is re-read.
+    # NOTE: `hyprctl keyword` does NOT work with the Lua config parser
+    # ("keyword can't work with non-legacy parsers"), so a reload is required.
+    if run("hyprctl reload"):
+        ok.append("hyprland")
+
+    # wallpaper: prefer a real image named after the theme, else the palette's
+    # `wallpaper=` (normally the generated gradient placeholder).
+    wpdir = f"{HOME}/Pictures/wallpapers"
+    path = ""
+    for ext in ("png", "jpg", "jpeg", "webp"):
+        cand = f"{wpdir}/{pal['_theme']}.{ext}"
+        if os.path.exists(cand):
+            path = cand
+            break
+    if not path:
+        wp = pal.get("wallpaper", "")
+        if wp:
+            path = wp if wp.startswith("/") else f"{wpdir}/{wp}"
+    if path:
+        if os.path.exists(path):
+            run(f'hyprctl hyprpaper preload "{path}"')
+            outs = subprocess.run("hyprctl monitors -j", shell=True,
+                                  capture_output=True, text=True)
+            names = re.findall(r'"name":\s*"([^"]+)"', outs.stdout or "")
+            for m in names or [""]:
+                run(f'hyprctl hyprpaper wallpaper "{m},{path}"')
+            ok.append("wallpaper")
+        else:
+            print(f"  ! wallpaper not found: {path}", file=sys.stderr)
+
+    return ok
+
+
+def apply(name):
+    pal = load(name)
+    pal['_theme'] = name
+    render(pal)
+    ok = reload_all(pal)
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    with open(STATE, "w") as f:
+        f.write(name + "\n")
+    print(f"theme: {pal.get('name', name)}  [reloaded: {', '.join(ok)}]")
+    print("  note: btop / lazygit / fuzzel pick up the new theme on next launch")
+
+
+def current():
+    try:
+        return open(STATE).read().strip()
+    except OSError:
+        return None
+
+
+def pick():
+    names = palettes()
+    cur = current()
+    menu = "\n".join(f"{'* ' if n == cur else '  '}{n}" for n in names)
+    if not shutil.which("fuzzel"):
+        sys.exit("theme: fuzzel not found; use `theme set NAME`")
+    r = subprocess.run(["fuzzel", "--dmenu", "--prompt", "theme  "],
+                       input=menu, capture_output=True, text=True)
+    choice = r.stdout.strip().lstrip("* ").strip()
+    if choice:
+        apply(choice)
+
+
+def main():
+    a = sys.argv[1:]
+    if not a:
+        pick()
+    elif a[0] == "list":
+        cur = current()
+        for n in palettes():
+            print(f"{'*' if n == cur else ' '} {n}")
+    elif a[0] == "current":
+        print(current() or "(unset)")
+    elif a[0] == "set" and len(a) > 1:
+        apply(a[1])
+    elif a[0] in palettes():
+        apply(a[0])
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+session="${1:-}"
+if [[ -z "$session" ]]; then
+	session="$(tmux list-sessions -F '#{session_name}' 2>/dev/null | rg '^dev-' | fzf --prompt='close session> ' --height=50% --layout=reverse --border)" || exit 0
+fi
+
+tmux kill-session -t "=$session"
