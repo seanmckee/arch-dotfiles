@@ -5,6 +5,9 @@
   theme list       list available themes
   theme set NAME   apply a theme
   theme current    show the active theme
+  theme nvim on    match Neovim to the active palette (restart Neovim)
+  theme nvim off   restore Tokyo Night Storm (restart Neovim)
+  theme nvim status
 """
 import os, re, subprocess, sys, glob, shutil
 
@@ -12,6 +15,7 @@ HOME = os.path.expanduser("~")
 DOT = f"{HOME}/dotfiles"
 THEMES = f"{DOT}/themes"
 STATE = f"{HOME}/.local/state/current-theme"
+NVIM_STATE = f"{HOME}/.local/state/nvim-theme-mode"
 
 # template -> destination (inside the dotfiles repo; symlinks make them live)
 TARGETS = {
@@ -23,6 +27,7 @@ TARGETS = {
     "btop.theme":        f"{DOT}/btop/.config/btop/themes/current.theme",
     "lazygit.yml":       f"{DOT}/lazygit/.config/lazygit/config.yml",
     "tmux.conf":         f"{DOT}/tmux/.tmux.conf",
+    "nvim-palette.lua":  f"{DOT}/nvim/.config/nvim/lua/theme/current.lua",
 }
 
 
@@ -162,6 +167,17 @@ def current():
         return None
 
 
+def nvim_mode(value=None):
+    if value is not None:
+        os.makedirs(os.path.dirname(NVIM_STATE), exist_ok=True)
+        with open(NVIM_STATE, "w") as f:
+            f.write(value + "\n")
+    try:
+        return open(NVIM_STATE).read().strip() == "on"
+    except OSError:
+        return False
+
+
 def pick():
     names = palettes()
     cur = current()
@@ -185,6 +201,12 @@ def main():
             print(f"{'*' if n == cur else ' '} {n}")
     elif a[0] == "current":
         print(current() or "(unset)")
+    elif a[0] == "nvim" and len(a) > 1 and a[1] in ("on", "off"):
+        nvim_mode(a[1])
+        state = "matching desktop palette" if a[1] == "on" else "Tokyo Night Storm"
+        print(f"theme: Neovim -> {state}; restart Neovim to apply")
+    elif a[0] == "nvim" and len(a) > 1 and a[1] == "status":
+        print("on (matching desktop palette)" if nvim_mode() else "off (Tokyo Night Storm)")
     elif a[0] == "set" and len(a) > 1:
         apply(a[1])
     elif a[0] in palettes():

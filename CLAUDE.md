@@ -59,9 +59,11 @@ Themes (11): `tokyo-night` (default), `catppuccin-mocha`, `gruvbox`, `rose-pine`
 `kanagawa`, `everforest`, `nord`, `dracula`, `synthwave`, `matrix`, `samurai`.
 **Adding a theme = one palette file**, no code changes.
 
-Wallpapers for the non-stock themes are generated with ffmpeg radial gradients into
-`~/Pictures/wallpapers/generated/`. Swap in real images by editing the palette's
-`wallpaper=` line.
+All 11 themes have real wallpapers at `~/Pictures/wallpapers/<theme>.png`, made from
+the per-theme prompts in `themes/WALLPAPER-PROMPTS.md` (one distinct medium each,
+16:10 for the 2240x1400 panel). The `theme` script prefers those by exact filename.
+`generated/` still holds the old ffmpeg gradient fallbacks, used only if an image is
+missing — **do not regenerate gradients over the real wallpapers.**
 
 ### Generated files (never edit directly)
 
@@ -75,6 +77,7 @@ Wallpapers for the non-stock themes are generated with ffmpeg radial gradients i
 | `btop.theme` | `btop/.config/btop/themes/current.theme` |
 | `lazygit.yml` | `lazygit/.config/lazygit/config.yml` |
 | `tmux.conf` | `tmux/.tmux.conf` |
+| `nvim-palette.lua` | `nvim/.config/nvim/lua/theme/current.lua` |
 
 Palette keys are semantic (`bg fg dim muted accent accent2 sel red green yellow blue
 magenta cyan border_active1/2 border_inactive wallpaper`). The script derives
@@ -103,9 +106,9 @@ wallpaper (`hyprctl hyprpaper`), and **running kitty windows** via `kitty @ set-
 (needs `listen_on unix:/tmp/kitty-{kitty_pid}` in kitty.conf — already set; only kitty
 processes started *after* that line was added expose a socket).
 
-btop / lazygit / fuzzel apply on next launch. **nvim is deliberately NOT wired in** —
-LazyVim colorscheme switching across running instances isn't clean, and matrix/samurai
-have no true nvim equivalent. It stays on tokyonight-storm.
+btop / lazygit / fuzzel apply on next launch. Neovim palette matching is opt-in with
+`theme nvim on`; `theme nvim off` restores Tokyo Night Storm. Both require restarting
+Neovim because live recoloring across instances is intentionally avoided.
 
 ## Palette: Tokyo Night Storm (the default theme)
 
@@ -209,8 +212,9 @@ Laptop, so prefer event-driven modules over polling.
 ## Known pre-existing issues (unfixed, flagged)
 
 1. **`monitors.lua` is orphaned** — nothing `require`s it, so the nwg-displays
-   three-monitor layout is NOT applied. `eDP-1` sits at `0x0`, not its configured
-   `3840x120`. `monitors.conf` and `workspaces.conf` (0 bytes) are also dead files.
+   three-monitor layout is NOT applied. `monitors.conf` (a 3-monitor nwg-displays
+   dump) and `workspaces.conf` (0 bytes) are dead files too, as are
+   `hyprland.lua.bak` and `kitty.conf.bak`. Safe to delete; nothing references them.
 2. `hyprpaper.conf` sets a wallpaper only for `eDP-1` and has no `preload` line.
 3. `local menu = "hyprlauncher"` in hyprland.lua is dead code (not installed; fuzzel is used).
 

@@ -149,6 +149,8 @@ development-server windows.
 | `theme` | Select a color theme |
 | `theme set NAME` | Apply a named theme directly |
 | `theme list` | List available themes |
+| `theme nvim on` | Match Neovim to the active desktop palette after restart |
+| `theme nvim off` | Restore Neovim's Tokyo Night Storm theme after restart |
 | `riceguide` | Open this guide |
 
 Useful modern replacements installed here include `rg` (grep), `fd` (find),
@@ -217,8 +219,10 @@ Use `Ctrl+L` when you need the browser address bar directly.
 ## Themes and configuration
 
 The `theme` command updates Hyprland, Waybar, Kitty, Fuzzel, Mako, btop,
-lazygit, tmux, and the wallpaper. Configuration lives in `~/dotfiles` and is
-linked into the home directory with GNU Stow.
+lazygit, tmux, and the wallpaper. Neovim follows the same palette when
+`theme nvim on` is enabled; use `theme nvim off` to restore Tokyo Night Storm.
+Configuration lives in `~/dotfiles` and is linked into the home directory with
+GNU Stow.
 
 Important locations:
 
